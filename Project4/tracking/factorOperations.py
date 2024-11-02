@@ -42,8 +42,9 @@ def joinFactorsByVariableWithCallTracking(callTrackingList=None):
 
         # typecheck portion
         numVariableOnLeft = len([factor for factor in currentFactorsToJoin if joinVariable in factor.unconditionedVariables()])
+        vars_on_left = [factor for factor in currentFactorsToJoin if joinVariable in factor.unconditionedVariables()]
         if numVariableOnLeft > 1:
-            print("Factor failed joinFactorsByVariable typecheck: ", factor)
+            print("Factor failed joinFactorsByVariable typecheck: ", vars_on_left)
             raise ValueError("The joinBy variable can only appear in one factor as an \nunconditioned variable. \n" +  
                                "joinVariable: " + str(joinVariable) + "\n" +
                                ", ".join(map(str, [factor.unconditionedVariables() for factor in currentFactorsToJoin])))
@@ -93,7 +94,7 @@ def joinFactors(factors: List[Factor]):
     if len(factors) > 1:
         intersect = functools.reduce(lambda x, y: x & y, setsOfUnconditioned)
         if len(intersect) > 0:
-            print("Factor failed joinFactors typecheck: ", factor)
+            print("Factor failed joinFactors typecheck: ", intersect)
             raise ValueError("unconditionedVariables can only appear in one factor. \n"
                     + "unconditionedVariables: " + str(intersect) + 
                     "\nappear in more than one input factor.\n" + 

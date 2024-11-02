@@ -634,3 +634,135 @@ class ParticleFilter(InferenceModule):
         raiseNotDefined()
         "*** END YOUR CODE HERE ***"
 
+
+
+class JointParticleFilter(ParticleFilter):
+    """
+    JointParticleFilter tracks a joint distribution over tuples of all ghost
+    positions.
+    """
+    def __init__(self, numParticles=600):
+        self.setNumParticles(numParticles)
+
+    def initialize(self, gameState, legalPositions):
+        """
+        Store information about the game, then initialize particles.
+        """
+        self.numGhosts = gameState.getNumAgents() - 1
+        self.ghostAgents = []
+        self.legalPositions = legalPositions
+        self.initializeUniformly(gameState)
+
+    ########### ########### ###########
+    ########### QUESTION 12 ###########
+    ########### ########### ###########
+
+    def initializeUniformly(self, gameState):
+        """
+        Initialize particles to be consistent with a uniform prior. Particles
+        should be evenly distributed across positions in order to ensure a
+        uniform prior.
+        """
+        self.particles = []
+        "*** YOUR CODE HERE ***"
+        raiseNotDefined()
+        "*** END YOUR CODE HERE ***"
+
+    def addGhostAgent(self, agent):
+        """
+        Each ghost agent is registered separately and stored (in case they are
+        different).
+        """
+        self.ghostAgents.append(agent)
+
+    def getJailPosition(self, i):
+        return (2 * i + 1, 1)
+
+    def observe(self, gameState):
+        """
+        Resample the set of particles using the likelihood of the noisy
+        observations.
+        """
+        observation = gameState.getNoisyGhostDistances()
+        self.observeUpdate(observation, gameState)
+
+    ########### ########### ###########
+    ########### QUESTION 13 ###########
+    ########### ########### ###########
+
+    def observeUpdate(self, observation, gameState):
+        """
+        Update beliefs based on the distance observation and Pacman's position.
+        The observation is the noisy Manhattan distances to all ghosts you
+        are tracking.
+        There is one special case that a correct implementation must handle.
+        When all particles receive zero weight, the list of particles should
+        be reinitialized by calling initializeUniformly. The total method of
+        the DiscreteDistribution may be useful.
+        """
+        "*** YOUR CODE HERE ***"
+        raiseNotDefined()
+        "*** END YOUR CODE HERE ***"
+
+    ########### ########### ###########
+    ########### QUESTION 14 ###########
+    ########### ########### ###########
+
+    def elapseTime(self, gameState):
+        """
+        Sample each particle's next state based on its current state and the
+        gameState.
+        """
+        newParticles = []
+        for oldParticle in self.particles:
+            newParticle = list(oldParticle)  # A list of ghost positions
+
+            # now loop through and update each entry in newParticle...
+            "*** YOUR CODE HERE ***"
+            raiseNotDefined()
+            """*** END YOUR CODE HERE ***"""
+            newParticles.append(tuple(newParticle))
+        self.particles = newParticles
+
+
+# One JointInference module is shared globally across instances of MarginalInference
+jointInference = JointParticleFilter()
+
+
+class MarginalInference(InferenceModule):
+    """
+    A wrapper around the JointInference module that returns marginal beliefs
+    about ghosts.
+    """
+    def initializeUniformly(self, gameState):
+        """
+        Set the belief state to an initial, prior value.
+        """
+        if self.index == 1:
+            jointInference.initialize(gameState, self.legalPositions)
+        jointInference.addGhostAgent(self.ghostAgent)
+
+    def observe(self, gameState):
+        """
+        Update beliefs based on the given distance observation and gameState.
+        """
+        if self.index == 1:
+            jointInference.observe(gameState)
+
+    def elapseTime(self, gameState):
+        """
+        Predict beliefs for a time step elapsing from a gameState.
+        """
+        if self.index == 1:
+            jointInference.elapseTime(gameState)
+
+    def getBeliefDistribution(self):
+        """
+        Return the marginal belief over a particular ghost by summing out the
+        others.
+        """
+        jointDistribution = jointInference.getBeliefDistribution()
+        dist = DiscreteDistribution()
+        for t, prob in jointDistribution.items():
+            dist[t[self.index - 1]] += prob
+        return dist

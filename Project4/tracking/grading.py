@@ -97,7 +97,7 @@ class Grades:
     for q in self.questions:
       print('Question %s: %d/%d' % (q, self.points[q], self.maxes[q]))
     print('------------------')
-    print('Total: %d/%d' % (self.points.totalCount(), sum(self.maxes.values())))
+    print('Total: %d/%d' % (self.points.totalCount(), 19))
     if bonusPic and self.points.totalCount() == 25:
       print("""
 
@@ -177,7 +177,7 @@ to follow your instructor's guidelines to receive credit on your project.
     out_dct = {}
 
     # total of entire submission
-    total_possible = sum(self.maxes.values())
+    total_possible = 20
     total_score = sum(self.points.values())
     out_dct['score'] = total_score
     out_dct['max_score'] = total_possible
