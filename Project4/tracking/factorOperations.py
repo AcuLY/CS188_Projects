@@ -102,9 +102,26 @@ def joinFactors(factors: List[Factor]):
                     "\n".join(map(str, factors)))
 
 
-    "*** YOUR CODE HERE ***"
-    raiseNotDefined()
-    "*** END YOUR CODE HERE ***"
+    # 获取变量及值域
+    conditionedVariables = set()
+    unconditionedVariables = set()
+    for factor in factors:
+        conditionedVariables.update(v for v in factor.conditionedVariables())
+        unconditionedVariables.update(v for v in factor.unconditionedVariables())
+    # 将同时出现在两侧的变量从右侧移除
+    conditionedVariables -= unconditionedVariables
+    # 变量值域字典
+    variableDomainsDict = list(factors)[0].variableDomainsDict()
+    # 创建新 Factor
+    jointFactor = Factor(unconditionedVariables, conditionedVariables, variableDomainsDict)
+    # 遍历所有输入 factor, 对概率进行累乘, 并赋值给 jointFactor 的所有组合
+    for assignmentDict in jointFactor.getAllPossibleAssignmentDicts():
+        probability = 1
+        for factor in factors:
+            probability *= factor.getProbability(assignmentDict)
+        jointFactor.setProbability(assignmentDict, probability)
+    
+    return jointFactor
 
 ########### ########### ###########
 ########### QUESTION 3  ###########
@@ -153,9 +170,23 @@ def eliminateWithCallTracking(callTrackingList=None):
                     "eliminationVariable:" + str(eliminationVariable) + "\n" +\
                     "unconditionedVariables: " + str(factor.unconditionedVariables()))
 
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        # 获取变量, 值域
+        conditionedVariables = factor.conditionedVariables()
+        unconditionedVariables = factor.unconditionedVariables()
+        variableDomainsDict = factor.variableDomainsDict()
+        # 移除要消去的变量, 并构造新的 Factor
+        unconditionedVariables.remove(eliminationVariable)
+        eliminatedFactor = Factor(unconditionedVariables, conditionedVariables, variableDomainsDict)
+        # 更新概率
+        for assignmentDict in eliminatedFactor.getAllPossibleAssignmentDicts():
+            # P(X,Y|Z) 消去 X 的 方法为 P(Y|Z) = P(x1,Y|Z) + P(x2,Y|Z) + ... + P(xn,Y|Z)
+            probability = 0
+            for assignment in variableDomainsDict[eliminationVariable]: # 遍历待消去变量的所有赋值
+                assignmentDict[eliminationVariable] = assignment    
+                probability += factor.getProbability(assignmentDict)    # 加总概率
+            eliminatedFactor.setProbability(assignmentDict, probability)
+        
+        return eliminatedFactor
 
     return eliminate
 

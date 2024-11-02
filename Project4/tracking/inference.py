@@ -60,9 +60,15 @@ def constructBayesNet(gameState: hunters.GameState):
     edges = []
     variableDomainsDict = {}
 
-    "*** YOUR CODE HERE ***"
-    raiseNotDefined()
-    "*** END YOUR CODE HERE ***"
+    variables.extend([PAC, GHOST0, GHOST1, OBS0, OBS1])
+    edges.extend([(PAC, OBS0), (PAC, OBS1), (GHOST0, OBS0), (GHOST1, OBS1)])
+    # 吃豆人和鬼可以出现在所有地方
+    variableDomainsDict[PAC] = list(itertools.product(range(X_RANGE), range(Y_RANGE)))
+    variableDomainsDict[GHOST0] = list(itertools.product(range(X_RANGE), range(Y_RANGE)))
+    variableDomainsDict[GHOST1] = list(itertools.product(range(X_RANGE), range(Y_RANGE)))
+    # 吃豆人和鬼的最大距离是分别在地图的对角时, 为 长 + 宽 - 1, 再加上最大噪声即可 
+    variableDomainsDict[OBS0] = range(X_RANGE + Y_RANGE + MAX_NOISE - 1)
+    variableDomainsDict[OBS1] = range(X_RANGE + Y_RANGE + MAX_NOISE - 1)
 
     net = bn.constructEmptyBayesNet(variables, edges, variableDomainsDict)
     return net
@@ -181,9 +187,20 @@ def inferenceByVariableEliminationWithCallTracking(callTrackingList=None):
                                    set(evidenceDict.keys())
             eliminationOrder = sorted(list(eliminationVariables))
 
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        # 贝叶斯网络所有的 Factors
+        currentFactorsList = bayesNet.getAllCPTsWithEvidence(evidenceDict)
+        # 遍历需要消去的变量
+        for eliminationVariable in eliminationOrder:
+            currentFactorsList, jointFactor = joinFactorsByVariable(currentFactorsList, eliminationVariable)
+            if len(jointFactor.unconditionedVariables()) == 1:   # 如果只有一个非条件变量则直接抛弃
+                continue
+            jointFactor = eliminate(jointFactor, eliminationVariable)
+            currentFactorsList.append(jointFactor)
+        # 合并结果为一个 Factor 并标准化
+        fullJoint = joinFactors(currentFactorsList)
+        normalizedFactor = normalize(fullJoint)
+        
+        return normalizedFactor
 
 
     return inferenceByVariableElimination
@@ -322,9 +339,10 @@ class DiscreteDistribution(dict):
         >>> empty
         {}
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        totalProbability = self.total()
+        if totalProbability:            
+            for key in self.keys():
+                self[key] /= totalProbability
 
     def sample(self):
         """
@@ -347,9 +365,11 @@ class DiscreteDistribution(dict):
         >>> round(samples.count('d') * 1.0/N, 1)
         0.0
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        countValue = self.total() * random.random()
+        for key in self.keys():
+            countValue -= self.__getitem__(key)
+            if countValue < 0:
+                return key
 
 
 class InferenceModule:
@@ -422,9 +442,17 @@ class InferenceModule:
         """
         Return the probability P(noisyDistance | pacmanPosition, ghostPosition).
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        # noisyDistance 为 None 当且仅当鬼在监狱
+        if ghostPosition == jailPosition:
+            if noisyDistance is None:
+                return 1
+            else:
+                return 0
+        if noisyDistance is None:
+            return 0
+        # 正常情况
+        distance = manhattanDistance(pacmanPosition, ghostPosition)
+        return busters.getObservationProbability(noisyDistance, distance)
 
     def setGhostPosition(self, gameState, ghostPosition, index):
         """
@@ -535,9 +563,13 @@ class ExactInference(InferenceModule):
         current position. However, this is not a problem, as Pacman's current
         position is known.
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        # 获取确定的位置
+        pacmanPosition = gameState.getPacmanPosition()
+        jailPosition = self.getJailPosition()
+        # 遍历所有位置并计算概率
+        for position in self.allPositions:
+            probability = self.getObservationProb(observation, pacmanPosition, position, jailPosition)
+            self.beliefs[position] *= probability
         self.beliefs.normalize()
     
     ########### ########### ###########
@@ -553,9 +585,14 @@ class ExactInference(InferenceModule):
         Pacman's current position. However, this is not a problem, as Pacman's
         current position is known.
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        newBeliefs = DiscreteDistribution() # 新的 belief, 防止在更新的时候旧 belief 被覆盖
+        for oldPos in self.allPositions:
+            newPosDist = self.getPositionDistribution(gameState, oldPos)
+            # 新位置的概率 = 所有 (旧位置的概率 * 旧位置到新位置的概率) 之和
+            for newPos in self.allPositions:
+                newBeliefs[newPos] += newPosDist[newPos] * self.beliefs[oldPos]
+        self.beliefs = newBeliefs
+        self.beliefs.normalize()
 
     def getBeliefDistribution(self):
         return self.beliefs
@@ -585,9 +622,11 @@ class ParticleFilter(InferenceModule):
         self.particles for the list of particles.
         """
         self.particles = []
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        number = self.numParticles
+        legalPositions = self.legalPositions
+        # 把 legalPositions 均匀加入样本列表中
+        for i in range(number):
+            self.particles.append(legalPositions[i % len(legalPositions)])
 
     def getBeliefDistribution(self):
         """
@@ -597,9 +636,12 @@ class ParticleFilter(InferenceModule):
 
         This function should return a normalized distribution.
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        beliefs = DiscreteDistribution()
+        # 对样本计数, 并将出现次数作为概率
+        for particle in self.particles:
+            beliefs[particle] += 1
+        beliefs.normalize()
+        return beliefs
     
     ########### ########### ###########
     ########### QUESTION 10 ###########
@@ -617,9 +659,18 @@ class ParticleFilter(InferenceModule):
         be reinitialized by calling initializeUniformly. The total method of
         the DiscreteDistribution may be useful.
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        pacmanPosition = gameState.getPacmanPosition()
+        jailPosition = self.getJailPosition()
+        # 根据概率构建新分布
+        weightDistribution = DiscreteDistribution()
+        for particle in self.particles:
+            weightDistribution[particle] += self.getObservationProb(observation, pacmanPosition, particle, jailPosition)
+        # 如果权重全零需要重采样
+        if not weightDistribution.total():
+            self.initializeUniformly(gameState)
+        else:
+            # 根据概率重采样
+            self.particles = [weightDistribution.sample() for _ in range(self.numParticles)]
     
     ########### ########### ###########
     ########### QUESTION 11 ###########
@@ -630,11 +681,12 @@ class ParticleFilter(InferenceModule):
         Sample each particle's next state based on its current state and the
         gameState.
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
-
-
+        newParticles = []
+        # 对每个样本根据时间变化的概率重采样
+        for oldPos in self.particles:   
+            newPosDist = self.getPositionDistribution(gameState, oldPos)
+            newParticles.append(newPosDist.sample())
+        self.particles = newParticles
 
 class JointParticleFilter(ParticleFilter):
     """
@@ -664,9 +716,12 @@ class JointParticleFilter(ParticleFilter):
         uniform prior.
         """
         self.particles = []
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        legalPositions = self.legalPositions
+        # 组合并打乱顺序
+        combPositions = list(itertools.product(legalPositions, legalPositions))
+        random.shuffle(combPositions)
+        for i in range(self.numParticles):
+            self.particles.append(combPositions[i % len(combPositions)])
 
     def addGhostAgent(self, agent):
         """
@@ -700,9 +755,19 @@ class JointParticleFilter(ParticleFilter):
         be reinitialized by calling initializeUniformly. The total method of
         the DiscreteDistribution may be useful.
         """
-        "*** YOUR CODE HERE ***"
-        raiseNotDefined()
-        "*** END YOUR CODE HERE ***"
+        pacmanPosition = gameState.getPacmanPosition()
+        weightDistribution = DiscreteDistribution()
+        for particle in self.particles:
+            particleWeight = 1  # 初始化为 1 用于累乘
+            # 遍历所有鬼, 累乘每个鬼在该位置的概率, 最后加到该位置元组的概率上
+            for i in range(self.numGhosts):
+                jailPosition = self.getJailPosition(i)
+                particleWeight *= self.getObservationProb(observation[i], pacmanPosition, particle[i], jailPosition)
+            weightDistribution[particle] += particleWeight
+        if weightDistribution.total():
+            self.particles = [weightDistribution.sample() for _ in range(self.numParticles)]
+        else:
+            self.initializeUniformly(gameState)
 
     ########### ########### ###########
     ########### QUESTION 14 ###########
@@ -718,9 +783,10 @@ class JointParticleFilter(ParticleFilter):
             newParticle = list(oldParticle)  # A list of ghost positions
 
             # now loop through and update each entry in newParticle...
-            "*** YOUR CODE HERE ***"
-            raiseNotDefined()
-            """*** END YOUR CODE HERE ***"""
+            for i in range(self.numGhosts):
+                newPosDist = self.getPositionDistribution(gameState, newParticle, i, self.ghostAgents[i])
+                newParticle[i] = newPosDist.sample()
+
             newParticles.append(tuple(newParticle))
         self.particles = newParticles
 
