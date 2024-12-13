@@ -48,7 +48,7 @@ class QLearningAgent(ReinforcementAgent):
         "You can initialize Q-values here..."
         ReinforcementAgent.__init__(self, **args)
 
-        "*** YOUR CODE HERE ***"
+        self.q_values = {}  # Q 值表, 每个键是一个 (state, action) 元组
 
     def getQValue(self, state, action):
         """
@@ -56,8 +56,10 @@ class QLearningAgent(ReinforcementAgent):
           Should return 0.0 if we have never seen a state
           or the Q node value otherwise
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        if (state, action) in self.q_values.keys(): # 若未记录则返回 0
+          return self.q_values[state, action]
+        
+        return 0.0
 
     def computeValueFromQValues(self, state):
         """
@@ -66,8 +68,13 @@ class QLearningAgent(ReinforcementAgent):
           there are no legal actions, which is the case at the
           terminal state, you should return a value of 0.0.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        legal_actions = self.getLegalActions(state) # 终点情况
+        if not legal_actions:
+          return 0.0
+        
+        q_values = [self.getQValue(state, action) for action in legal_actions]
+        
+        return max(q_values)  # 返回最大的 Q 值
 
     def computeActionFromQValues(self, state):
         """
@@ -75,8 +82,14 @@ class QLearningAgent(ReinforcementAgent):
           are no legal actions, which is the case at the terminal state,
           you should return None.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        legal_actions = self.getLegalActions(state)
+        if not legal_actions:
+          return None
+        
+        max_q = max([self.getQValue(state, action) for action in legal_actions])  # 最大 Q 值
+        optimal_actions = [action for action in legal_actions if self.getQValue(state, action) == max_q]  # 找出所有最优动作
+        
+        return random.choice(optimal_actions) # 随机选一个最优动作
 
     def getAction(self, state):
         """
@@ -89,12 +102,14 @@ class QLearningAgent(ReinforcementAgent):
           HINT: To pick randomly from a list, use random.choice(list)
         """
         # Pick Action
-        legalActions = self.getLegalActions(state)
-        action = None
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
-
-        return action
+        legal_actions = self.getLegalActions(state)
+        if not legal_actions:
+          return None
+        
+        if util.flipCoin(self.epsilon): # 根据 epsilon 决定是否随机移动
+          return random.choice(legal_actions)
+        
+        return self.getPolicy(state) # 否则选最佳动作
 
     def update(self, state, action, nextState, reward: float):
         """
@@ -104,8 +119,9 @@ class QLearningAgent(ReinforcementAgent):
           NOTE: You should never call this function,
           it will be called on your behalf
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        # 根据公式更新
+        target = reward + self.discount * self.getValue(nextState)
+        self.q_values[(state, action)] = (1 - self.alpha) * self.getQValue(state, action) + self.alpha * target
 
     def getPolicy(self, state):
         return self.computeActionFromQValues(state)
@@ -164,15 +180,33 @@ class ApproximateQAgent(PacmanQAgent):
           Should return Q(state,action) = w * featureVector
           where * is the dotProduct operator
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        feature_vector = self.featExtractor.getFeatures(state, action)
+        dot_product = 0
+        
+        for feature in feature_vector.keys():
+          if not feature in self.getWeights().keys(): # 处理未更新过的权重
+            continue
+          
+          dot_product += self.getWeights()[feature] * feature_vector[feature] # 计算点积
+        
+        return dot_product
 
     def update(self, state, action, nextState, reward: float):
         """
            Should update your weights based on transition
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        target = reward + self.discount * self.getValue(nextState)
+        difference = target - self.getQValue(state, action)
+        feature_vector = self.featExtractor.getFeatures(state, action)
+
+        for feature in feature_vector.keys():
+          if feature in self.weights.keys():  # 处理未更新过的权重
+            prev_weight = self.weights[feature]
+          else:
+            prev_weight = 0
+
+          # 根据公式更新权重
+          self.getWeights()[feature] = prev_weight + self.alpha * difference * feature_vector[feature]
 
     def final(self, state):
         """Called at the end of each game."""

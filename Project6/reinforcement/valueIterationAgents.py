@@ -64,7 +64,21 @@ class ValueIterationAgent(ValueEstimationAgent):
           Run the value iteration algorithm. Note that in standard
           value iteration, V_k+1(...) depends on V_k(...)'s.
         """
-        "*** YOUR CODE HERE ***"
+        for _ in range(self.iterations):
+            new_values = util.Counter() # 创建新的 values 字典防止覆盖
+            
+            for state in self.mdp.getStates():
+                if self.mdp.isTerminal(state):  # 处理终点情况
+                    continue
+                
+                q_values = []
+                for action in self.mdp.getPossibleActions(state):   # 遍历所有动作, 取 Q 值最大的作为新的 value
+                    q_value = self.getQValue(state, action)
+                    q_values.append(q_value)
+                
+                new_values[state] = max(q_values)
+
+            self.values = new_values
 
     def getValue(self, state):
         """
@@ -77,8 +91,14 @@ class ValueIterationAgent(ValueEstimationAgent):
           Compute the Q-value of action in state from the
           value function stored in self.values.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        transitions = self.mdp.getTransitionStatesAndProbs(state, action)
+        total_value = 0
+        
+        for next_state, prob in transitions:    # 根据公式计算 Q 值
+            reward = self.mdp.getReward(state, action, next_state)
+            total_value += prob * (reward + self.discount * self.getValue(next_state))
+        
+        return total_value
 
     def computeActionFromValues(self, state):
         """
@@ -89,8 +109,21 @@ class ValueIterationAgent(ValueEstimationAgent):
           there are no legal actions, which is the case at the
           terminal state, you should return None.
         """
-        "*** YOUR CODE HERE ***"
-        util.raiseNotDefined()
+        possible_actions = self.mdp.getPossibleActions(state)
+        if not possible_actions:    # 终点状态
+            return None
+        
+        policy = None
+        max_value = -float('inf')
+        
+        for action in possible_actions: # 选择最优动作
+            q_value = self.getQValue(state, action)
+            
+            if q_value > max_value:
+                max_value = q_value
+                policy = action
+        
+        return policy
 
     def getPolicy(self, state):
         return self.computeActionFromValues(state)

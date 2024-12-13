@@ -11,7 +11,17 @@ class DeepQNetwork():
 
         # Remember to set self.learning_rate, self.numTrainingGames,
         # self.parameters, and self.batch_size!
-        "*** YOUR CODE HERE ***"
+        self.parameters = [ # 两层隐藏层
+            nn.Parameter(state_dim, 300),
+            nn.Parameter(1, 300),
+            nn.Parameter(300, 100),
+            nn.Parameter(1, 100),
+            nn.Parameter(100, action_dim),
+            nn.Parameter(1, action_dim)
+        ]
+        self.learning_rate = 0.5
+        self.numTrainingGames = 3000
+        self.batch_size = 100
 
     def set_weights(self, layers):
         self.parameters = []
@@ -28,7 +38,11 @@ class DeepQNetwork():
         Output:
             loss node between Q predictions and Q_target
         """
-        "*** YOUR CODE HERE ***"
+        if not Q_target:    # 处理无 Q_target 的情况
+            return 0
+        
+        prediction = self.run(states)
+        return nn.SquareLoss(prediction, Q_target)
 
     def run(self, states):
         """
@@ -43,7 +57,18 @@ class DeepQNetwork():
             result: (batch_size x num_actions) numpy array of Q-value
                 scores, for each of the actions
         """
-        "*** YOUR CODE HERE ***"
+        hidden1 = nn.Linear(states, self.parameters[0])
+        hidden1 = nn.AddBias(hidden1, self.parameters[1])
+        hidden1 = nn.ReLU(hidden1)
+        
+        hidden2 = nn.Linear(hidden1, self.parameters[2])
+        hidden2 = nn.AddBias(hidden2, self.parameters[3])
+        hidden2 = nn.ReLU(hidden2)
+        
+        output = nn.Linear(hidden2, self.parameters[4])
+        output = nn.AddBias(output, self.parameters[5])
+        
+        return output
 
     def gradient_update(self, states, Q_target):
         """
@@ -54,4 +79,8 @@ class DeepQNetwork():
         Output:
             None
         """
-        "*** YOUR CODE HERE ***"
+        loss = self.get_loss(states, Q_target)
+        gradients = nn.gradients(loss, self.parameters)
+        
+        for index, gradient in enumerate(gradients):
+            self.parameters[index].update(gradient, -self.learning_rate)
